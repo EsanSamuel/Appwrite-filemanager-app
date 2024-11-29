@@ -17,28 +17,28 @@ import {
 import { Input } from "@/components/ui/input";
 import Image from "next/image";
 import Link from "next/link";
-import { createAccount } from "@/lib/actions/user.action";
+import { createAccount, signInUser } from "@/lib/actions/user.action";
 import OTPModal from "./OTPModal";
 
 type FormType = "sign-in" | "sign-up";
 
-const formSchema = z.object({
-  fullname: z
-    .string()
-    .min(2, {
-      message: "Username must be at least 2 characters.",
-    })
-    .optional(),
-  email: z.string().email(),
-});
-
-type formSchemaType = z.infer<typeof formSchema>;
+const authFormSchema = (formType: FormType) => {
+  return z.object({
+    email: z.string().email(),
+    fullname:
+      formType === "sign-up"
+        ? z.string().min(2).max(50)
+        : z.string().optional(),
+  });
+};
 
 const AuthForm = ({ type }: { type: FormType }) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [accountId, setAccountId] = useState("");
-  const form = useForm<formSchemaType>({
+  const formSchema = authFormSchema(type);
+
+  const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       fullname: "",
@@ -46,15 +46,18 @@ const AuthForm = ({ type }: { type: FormType }) => {
     },
   });
 
-  async function onSubmit(values: formSchemaType) {
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     console.log(values);
     setIsLoading(true);
 
     try {
-      const user = await createAccount({
-        fullName: values.fullname || "",
-        email: values.email,
-      });
+      const user =
+        type === "sign-up"
+          ? await createAccount({
+              fullName: values.fullname || "",
+              email: values.email,
+            })
+          : await signInUser({ email: values.email });
 
       setAccountId(user.accountId);
     } catch (error) {
@@ -121,7 +124,6 @@ const AuthForm = ({ type }: { type: FormType }) => {
             className="form-submit-button"
             disabled={isLoading}
           >
-            {" "}
             {type === "sign-in" ? "Sign In" : "Sign Up"}
             {isLoading && (
               <Image
